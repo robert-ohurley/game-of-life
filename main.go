@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 )
@@ -17,63 +18,12 @@ type Cell struct {
 
 func (c *Cell) kill() {
 	c.alive = false
-	c.char = ". "
+	c.char = "  "
 }
 
 func (c *Cell) revive() {
 	c.alive = true
 	c.char = " o"
-}
-
-type board struct {
-	currentGen [][]Cell
-	nextGen    [][]Cell
-	height     int
-	width      int
-}
-
-type GameParams struct {
-	height              int
-	width               int
-	generationalDelayMs int
-}
-
-type Life struct {
-	Board  *board
-	params *GameParams
-}
-
-var adjacent = []pos{
-	[2]int{-1, -1},
-	[2]int{-1, 0},
-	[2]int{-1, 1},
-	[2]int{0, 1},
-	[2]int{0, -1},
-	[2]int{1, 1},
-	[2]int{1, 0},
-	[2]int{1, -1},
-}
-
-var gol Life
-
-func (l *Life) Sleep() {
-	time.Sleep(time.Duration(gol.params.generationalDelayMs) * time.Millisecond)
-}
-
-func (l *Life) Tick() {
-	for rowIdx, cellArray := range l.Board.currentGen {
-		for colIdx, cell := range cellArray {
-			if alive := cell.CheckRules(); alive == true {
-				l.Board.nextGen[rowIdx][colIdx].revive()
-			} else {
-				l.Board.nextGen[rowIdx][colIdx].kill()
-			}
-		}
-	}
-
-	for rowIdx := range l.Board.nextGen {
-		copy(l.Board.currentGen[rowIdx], l.Board.nextGen[rowIdx])
-	}
 }
 
 func (c *Cell) CheckRules() bool {
@@ -100,6 +50,59 @@ func (c *Cell) CheckRules() bool {
 	}
 }
 
+var adjacent = []pos{
+	[2]int{-1, -1},
+	[2]int{-1, 0},
+	[2]int{-1, 1},
+	[2]int{0, 1},
+	[2]int{0, -1},
+	[2]int{1, 1},
+	[2]int{1, 0},
+	[2]int{1, -1},
+}
+
+type board struct {
+	currentGen [][]Cell
+	nextGen    [][]Cell
+	height     int
+	width      int
+}
+
+type GameParams struct {
+	height                     int
+	width                      int
+	generationalDelayMs        int
+	randomSeed                 bool
+	percentChanceOfLivingStart int
+}
+
+type Life struct {
+	Board  *board
+	params *GameParams
+}
+
+var gol Life
+
+func (l *Life) Sleep() {
+	time.Sleep(time.Duration(gol.params.generationalDelayMs) * time.Millisecond)
+}
+
+func (l *Life) Tick() {
+	for rowIdx, cellArray := range l.Board.currentGen {
+		for colIdx, cell := range cellArray {
+			if alive := cell.CheckRules(); alive == true {
+				l.Board.nextGen[rowIdx][colIdx].revive()
+			} else {
+				l.Board.nextGen[rowIdx][colIdx].kill()
+			}
+		}
+	}
+
+	for rowIdx := range l.Board.nextGen {
+		copy(l.Board.currentGen[rowIdx], l.Board.nextGen[rowIdx])
+	}
+}
+
 func checkArrayBounds(c *Cell, p *pos, g *board) bool {
 	y := c.row + p[0]
 	x := c.col + p[1]
@@ -119,14 +122,76 @@ func (l *Life) Print() {
 
 	sb.WriteString("\n")
 	fmt.Println(sb.String())
+
 }
 
-func (l *Life) createGlider(p pos) {
-	l.Board.currentGen[p[0]][p[1]].revive()
-	l.Board.currentGen[p[0]+1][p[1]+1].revive()
-	l.Board.currentGen[p[0]+1][p[1]+2].revive()
-	l.Board.currentGen[p[0]][p[1]+2].revive()
-	l.Board.currentGen[p[0]-1][p[1]+2].revive()
+type ShapeCreator struct{}
+
+func (s *ShapeCreator) createGlider(b *board, p pos) {
+	b.currentGen[p[0]][p[1]].revive()
+	b.currentGen[p[0]+1][p[1]+1].revive()
+	b.currentGen[p[0]+1][p[1]+2].revive()
+	b.currentGen[p[0]][p[1]+2].revive()
+	b.currentGen[p[0]-1][p[1]+2].revive()
+}
+
+func (s *ShapeCreator) createGosperGliderGun(b *board, p pos) {
+	points := []pos{
+		[2]int{p[0], p[1]},
+		[2]int{p[0] + 1, p[1]},
+		[2]int{p[0], p[1] + 1},
+		[2]int{p[0] + 1, p[1] + 1},
+
+		[2]int{p[0] - 2, p[1] + 13},
+		[2]int{p[0] - 2, p[1] + 12},
+		[2]int{p[0] - 1, p[1] + 11},
+		[2]int{p[0], p[1] + 10},
+		[2]int{p[0] + 1, p[1] + 10},
+		[2]int{p[0] + 1, p[1] + 14},
+		[2]int{p[0] + 2, p[1] + 10},
+		[2]int{p[0] + 3, p[1] + 11},
+		[2]int{p[0] + 4, p[1] + 12},
+		[2]int{p[0] + 4, p[1] + 13},
+
+		//bottom of the C
+		[2]int{p[0] + 4, p[1] + 13},
+
+		//dot in the middle
+		[2]int{p[0] + 1, p[1] + 14},
+		[2]int{p[0] - 1, p[1] + 15},
+		[2]int{p[0] + 3, p[1] + 15},
+
+		[2]int{p[0] + 1, p[1] + 16},
+		[2]int{p[0] + 2, p[1] + 16},
+		[2]int{p[0], p[1] + 16},
+		[2]int{p[0] + 1, p[1] + 17},
+
+		//bottom of 3x2 cube
+		[2]int{p[0], p[1] + 20},
+		[2]int{p[0], p[1] + 21},
+		[2]int{p[0] - 1, p[1] + 20},
+		[2]int{p[0] - 1, p[1] + 21},
+		[2]int{p[0] - 2, p[1] + 20},
+		[2]int{p[0] - 2, p[1] + 21},
+
+		[2]int{p[0] + 1, p[1] + 22},
+		[2]int{p[0] - 3, p[1] + 22},
+
+		[2]int{p[0] + 1, p[1] + 24},
+		[2]int{p[0] + 2, p[1] + 24},
+		[2]int{p[0] - 3, p[1] + 24},
+		//highest point
+		[2]int{p[0] - 4, p[1] + 24},
+
+		[2]int{p[0] - 2, p[1] + 34},
+		[2]int{p[0] - 1, p[1] + 34},
+		[2]int{p[0] - 2, p[1] + 35},
+		[2]int{p[0] - 1, p[1] + 35},
+	}
+
+	for _, position := range points {
+		b.currentGen[position[0]][position[1]].revive()
+	}
 }
 
 func InitGame(p *GameParams) *Life {
@@ -149,11 +214,21 @@ func (l *Life) InitCells() *Life {
 
 	for rowIdx := range l.Board.currentGen {
 		for colIdx := range l.Board.currentGen[rowIdx] {
+
 			cell := Cell{
 				alive: false,
 				row:   rowIdx,
 				col:   colIdx,
 				char:  " .",
+			}
+
+			if l.params.randomSeed == true {
+				randInt := rand.Intn(100)
+				if randInt > l.params.percentChanceOfLivingStart {
+					cell.kill()
+				} else {
+					cell.revive()
+				}
 			}
 
 			l.Board.currentGen[rowIdx][colIdx] = cell
@@ -170,16 +245,17 @@ func (l *Life) InitCells() *Life {
 
 func main() {
 	p := &GameParams{
-		height:              20,
-		width:               30,
-		generationalDelayMs: 300,
+		height:                     50,
+		width:                      90,
+		generationalDelayMs:        300,
+		randomSeed:                 false,
+		percentChanceOfLivingStart: 20,
 	}
 
 	InitGame(p)
 
-	gol.createGlider(pos{3, 3})
-	gol.createGlider(pos{8, 6})
-	gol.createGlider(pos{15, 15})
+	sc := ShapeCreator{}
+	sc.createGosperGliderGun(gol.Board, [2]int{20, 20})
 
 	gol.Print()
 
