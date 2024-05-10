@@ -1,4 +1,4 @@
-package main
+package maijfsfn
 
 import (
 	"fmt"
@@ -69,11 +69,10 @@ type board struct {
 }
 
 type GameParams struct {
-	height                     int
-	width                      int
-	generationalDelayMs        int
-	randomSeed                 bool
-	percentChanceOfLivingStart int
+	height              int
+	width               int
+	generationalDelayMs int
+	percentStartAlive   int
 }
 
 type Life struct {
@@ -125,75 +124,6 @@ func (l *Life) Print() {
 
 }
 
-type ShapeCreator struct{}
-
-func (s *ShapeCreator) createGlider(b *board, p pos) {
-	b.currentGen[p[0]][p[1]].revive()
-	b.currentGen[p[0]+1][p[1]+1].revive()
-	b.currentGen[p[0]+1][p[1]+2].revive()
-	b.currentGen[p[0]][p[1]+2].revive()
-	b.currentGen[p[0]-1][p[1]+2].revive()
-}
-
-func (s *ShapeCreator) createGosperGliderGun(b *board, p pos) {
-	points := []pos{
-		[2]int{p[0], p[1]},
-		[2]int{p[0] + 1, p[1]},
-		[2]int{p[0], p[1] + 1},
-		[2]int{p[0] + 1, p[1] + 1},
-
-		[2]int{p[0] - 2, p[1] + 13},
-		[2]int{p[0] - 2, p[1] + 12},
-		[2]int{p[0] - 1, p[1] + 11},
-		[2]int{p[0], p[1] + 10},
-		[2]int{p[0] + 1, p[1] + 10},
-		[2]int{p[0] + 1, p[1] + 14},
-		[2]int{p[0] + 2, p[1] + 10},
-		[2]int{p[0] + 3, p[1] + 11},
-		[2]int{p[0] + 4, p[1] + 12},
-		[2]int{p[0] + 4, p[1] + 13},
-
-		//bottom of the C
-		[2]int{p[0] + 4, p[1] + 13},
-
-		//dot in the middle
-		[2]int{p[0] + 1, p[1] + 14},
-		[2]int{p[0] - 1, p[1] + 15},
-		[2]int{p[0] + 3, p[1] + 15},
-
-		[2]int{p[0] + 1, p[1] + 16},
-		[2]int{p[0] + 2, p[1] + 16},
-		[2]int{p[0], p[1] + 16},
-		[2]int{p[0] + 1, p[1] + 17},
-
-		//bottom of 3x2 cube
-		[2]int{p[0], p[1] + 20},
-		[2]int{p[0], p[1] + 21},
-		[2]int{p[0] - 1, p[1] + 20},
-		[2]int{p[0] - 1, p[1] + 21},
-		[2]int{p[0] - 2, p[1] + 20},
-		[2]int{p[0] - 2, p[1] + 21},
-
-		[2]int{p[0] + 1, p[1] + 22},
-		[2]int{p[0] - 3, p[1] + 22},
-
-		[2]int{p[0] + 1, p[1] + 24},
-		[2]int{p[0] + 2, p[1] + 24},
-		[2]int{p[0] - 3, p[1] + 24},
-		//highest point
-		[2]int{p[0] - 4, p[1] + 24},
-
-		[2]int{p[0] - 2, p[1] + 34},
-		[2]int{p[0] - 1, p[1] + 34},
-		[2]int{p[0] - 2, p[1] + 35},
-		[2]int{p[0] - 1, p[1] + 35},
-	}
-
-	for _, position := range points {
-		b.currentGen[position[0]][position[1]].revive()
-	}
-}
-
 func InitGame(p *GameParams) *Life {
 	gol = Life{
 		Board: &board{
@@ -222,12 +152,12 @@ func (l *Life) InitCells() *Life {
 				char:  " .",
 			}
 
-			if l.params.randomSeed == true {
+			if l.params.percentStartAlive > 0 {
 				randInt := rand.Intn(100)
-				if randInt > l.params.percentChanceOfLivingStart {
-					cell.kill()
-				} else {
+				if randInt <= l.params.percentStartAlive {
 					cell.revive()
+				} else {
+					cell.kill()
 				}
 			}
 
@@ -245,17 +175,16 @@ func (l *Life) InitCells() *Life {
 
 func main() {
 	p := &GameParams{
-		height:                     50,
-		width:                      90,
-		generationalDelayMs:        300,
-		randomSeed:                 false,
-		percentChanceOfLivingStart: 20,
+		height:              50,
+		width:               90,
+		generationalDelayMs: 300,
+		percentStartAlive:   0,
 	}
 
 	InitGame(p)
 
 	sc := ShapeCreator{}
-	sc.createGosperGliderGun(gol.Board, [2]int{20, 20})
+	sc.CreateGosperGliderGun(gol.Board, [2]int{20, 20})
 
 	gol.Print()
 
@@ -263,5 +192,75 @@ func main() {
 		gol.Tick()
 		gol.Print()
 		gol.Sleep()
+	}
+}
+
+type ShapeCreator struct{}
+
+func (s *ShapeCreator) CreateGlider(b *board, p pos) {
+	points := []pos{
+		[2]int{p[0], p[1]},
+		[2]int{p[0] + 1, p[1] + 1},
+		[2]int{p[0] + 1, p[1] + 2},
+		[2]int{p[0], p[1] + 2},
+		[2]int{p[0] - 1, p[1] + 2},
+	}
+
+	for _, position := range points {
+		b.currentGen[position[0]][position[1]].revive()
+	}
+}
+
+func (s *ShapeCreator) CreateGosperGliderGun(b *board, p pos) {
+	points := []pos{
+		[2]int{p[0], p[1]},
+		[2]int{p[0] + 1, p[1]},
+		[2]int{p[0], p[1] + 1},
+		[2]int{p[0] + 1, p[1] + 1},
+
+		[2]int{p[0] - 2, p[1] + 13},
+		[2]int{p[0] - 2, p[1] + 12},
+		[2]int{p[0] - 1, p[1] + 11},
+		[2]int{p[0], p[1] + 10},
+		[2]int{p[0] + 1, p[1] + 10},
+		[2]int{p[0] + 1, p[1] + 14},
+		[2]int{p[0] + 2, p[1] + 10},
+		[2]int{p[0] + 3, p[1] + 11},
+		[2]int{p[0] + 4, p[1] + 12},
+		[2]int{p[0] + 4, p[1] + 13},
+
+		[2]int{p[0] + 4, p[1] + 13},
+		[2]int{p[0] + 1, p[1] + 14},
+		[2]int{p[0] - 1, p[1] + 15},
+		[2]int{p[0] + 3, p[1] + 15},
+
+		[2]int{p[0] + 1, p[1] + 16},
+		[2]int{p[0] + 2, p[1] + 16},
+		[2]int{p[0], p[1] + 16},
+		[2]int{p[0] + 1, p[1] + 17},
+
+		[2]int{p[0], p[1] + 20},
+		[2]int{p[0], p[1] + 21},
+		[2]int{p[0] - 1, p[1] + 20},
+		[2]int{p[0] - 1, p[1] + 21},
+		[2]int{p[0] - 2, p[1] + 20},
+		[2]int{p[0] - 2, p[1] + 21},
+
+		[2]int{p[0] + 1, p[1] + 22},
+		[2]int{p[0] - 3, p[1] + 22},
+
+		[2]int{p[0] + 1, p[1] + 24},
+		[2]int{p[0] + 2, p[1] + 24},
+		[2]int{p[0] - 3, p[1] + 24},
+		[2]int{p[0] - 4, p[1] + 24},
+
+		[2]int{p[0] - 2, p[1] + 34},
+		[2]int{p[0] - 1, p[1] + 34},
+		[2]int{p[0] - 2, p[1] + 35},
+		[2]int{p[0] - 1, p[1] + 35},
+	}
+
+	for _, position := range points {
+		b.currentGen[position[0]][position[1]].revive()
 	}
 }
