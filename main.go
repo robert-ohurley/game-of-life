@@ -1,4 +1,4 @@
-package maijfsfn
+package main
 
 import (
 	"fmt"
@@ -7,48 +7,7 @@ import (
 	"time"
 )
 
-type pos [2]int
-
-type Cell struct {
-	row   int
-	col   int
-	alive bool
-	char  string
-}
-
-func (c *Cell) kill() {
-	c.alive = false
-	c.char = "  "
-}
-
-func (c *Cell) revive() {
-	c.alive = true
-	c.char = " o"
-}
-
-func (c *Cell) CheckRules() bool {
-	adjacentAliveCount := 0
-
-	for _, p := range adjacent {
-		if outOfBounds := checkArrayBounds(c, &p, gol.Board); outOfBounds == true {
-			continue
-		} else if gol.Board.currentGen[c.row+p[0]][c.col+p[1]].alive == true {
-			adjacentAliveCount++
-		}
-	}
-
-	if c.alive == true && adjacentAliveCount < 2 {
-		return false //underpopulation
-	} else if c.alive == true && (adjacentAliveCount == 2 || adjacentAliveCount == 3) {
-		return true //life
-	} else if c.alive == true && adjacentAliveCount > 3 {
-		return false //overpopulation
-	} else if c.alive == false && adjacentAliveCount == 3 {
-		return true //reproduction
-	} else {
-		return false
-	}
-}
+var gol Life
 
 var adjacent = []pos{
 	[2]int{-1, -1},
@@ -59,6 +18,15 @@ var adjacent = []pos{
 	[2]int{1, 1},
 	[2]int{1, 0},
 	[2]int{1, -1},
+}
+
+type pos [2]int
+
+type Cell struct {
+	row   int
+	col   int
+	alive bool
+	char  string
 }
 
 type board struct {
@@ -73,6 +41,7 @@ type GameParams struct {
 	width               int
 	generationalDelayMs int
 	percentStartAlive   int
+	colorsActive        bool
 }
 
 type Life struct {
@@ -80,7 +49,56 @@ type Life struct {
 	params *GameParams
 }
 
-var gol Life
+func (c *Cell) birth() {
+	c.alive = true
+	if gol.params.colorsActive == true {
+		c.char = strings.Join([]string{"\033[35m", "o", "\033[0m"}, "")
+	} else {
+		c.char = "o"
+	}
+}
+
+func (c *Cell) live() {
+	c.alive = true
+	if gol.params.colorsActive == true {
+		c.char = strings.Join([]string{"\033[34m", "o", "\033[0m"}, "")
+	} else {
+		c.char = "o"
+	}
+}
+
+func (c *Cell) kill() {
+	c.alive = false
+	if gol.params.colorsActive == true {
+		c.char = strings.Join([]string{"\033[31m", " ", "\033[0m"}, "")
+	} else {
+		c.char = " "
+	}
+}
+
+func (c *Cell) CheckRules() string {
+	adjacentAliveCount := 0
+
+	for _, p := range adjacent {
+		if outOfBounds := checkArrayBounds(c, &p, gol.Board); outOfBounds == true {
+			continue
+		} else if gol.Board.currentGen[c.row+p[0]][c.col+p[1]].alive == true {
+			adjacentAliveCount++
+		}
+	}
+
+	if c.alive == true && adjacentAliveCount < 2 {
+		return "dies" //underpopulation
+	} else if c.alive == true && (adjacentAliveCount == 2 || adjacentAliveCount == 3) {
+		return "lives" //life
+	} else if c.alive == true && adjacentAliveCount > 3 {
+		return "dies" //overpopulation
+	} else if c.alive == false && adjacentAliveCount == 3 {
+		return "reborn" //reproduction
+	} else {
+		return "dies"
+	}
+}
 
 func (l *Life) Sleep() {
 	time.Sleep(time.Duration(gol.params.generationalDelayMs) * time.Millisecond)
@@ -89,10 +107,12 @@ func (l *Life) Sleep() {
 func (l *Life) Tick() {
 	for rowIdx, cellArray := range l.Board.currentGen {
 		for colIdx, cell := range cellArray {
-			if alive := cell.CheckRules(); alive == true {
-				l.Board.nextGen[rowIdx][colIdx].revive()
-			} else {
+			if result := cell.CheckRules(); result == "lives" {
+				l.Board.nextGen[rowIdx][colIdx].live()
+			} else if result == "dies" {
 				l.Board.nextGen[rowIdx][colIdx].kill()
+			} else if result == "reborn" {
+				l.Board.nextGen[rowIdx][colIdx].birth()
 			}
 		}
 	}
@@ -121,20 +141,6 @@ func (l *Life) Print() {
 
 	sb.WriteString("\n")
 	fmt.Println(sb.String())
-
-}
-
-func InitGame(p *GameParams) *Life {
-	gol = Life{
-		Board: &board{
-			currentGen: make([][]Cell, p.height),
-			nextGen:    make([][]Cell, p.height),
-			height:     p.height,
-			width:      p.width,
-		},
-		params: p,
-	}
-	return gol.InitCells()
 }
 
 func (l *Life) InitCells() *Life {
@@ -155,7 +161,7 @@ func (l *Life) InitCells() *Life {
 			if l.params.percentStartAlive > 0 {
 				randInt := rand.Intn(100)
 				if randInt <= l.params.percentStartAlive {
-					cell.revive()
+					cell.live()
 				} else {
 					cell.kill()
 				}
@@ -173,18 +179,33 @@ func (l *Life) InitCells() *Life {
 	return l
 }
 
+func InitGame(p *GameParams) *Life {
+	gol = Life{
+		Board: &board{
+			currentGen: make([][]Cell, p.height),
+			nextGen:    make([][]Cell, p.height),
+			height:     p.height,
+			width:      p.width,
+		},
+		params: p,
+	}
+	return gol.InitCells()
+}
+
 func main() {
 	p := &GameParams{
 		height:              50,
-		width:               90,
+		width:               180,
 		generationalDelayMs: 300,
 		percentStartAlive:   0,
+		colorsActive:        true,
 	}
 
 	InitGame(p)
 
 	sc := ShapeCreator{}
-	sc.CreateGosperGliderGun(gol.Board, [2]int{20, 20})
+	sc.CreateGosperGliderGun(gol.Board, [2]int{10, 20})
+	sc.CreateGosperGliderGun(gol.Board, [2]int{30, 50})
 
 	gol.Print()
 
@@ -207,7 +228,7 @@ func (s *ShapeCreator) CreateGlider(b *board, p pos) {
 	}
 
 	for _, position := range points {
-		b.currentGen[position[0]][position[1]].revive()
+		b.currentGen[position[0]][position[1]].live()
 	}
 }
 
@@ -261,6 +282,6 @@ func (s *ShapeCreator) CreateGosperGliderGun(b *board, p pos) {
 	}
 
 	for _, position := range points {
-		b.currentGen[position[0]][position[1]].revive()
+		b.currentGen[position[0]][position[1]].live()
 	}
 }
