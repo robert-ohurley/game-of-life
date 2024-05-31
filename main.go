@@ -30,10 +30,16 @@ type Cell struct {
 }
 
 type board struct {
-	currentGen [][]Cell
-	nextGen    [][]Cell
-	height     int
-	width      int
+	currentBuffer [][]Cell
+	nextBuffer    [][]Cell
+	height        int
+	width         int
+}
+
+func (b *board) SwapBuffers() {
+	temp := b.currentBuffer
+	b.currentBuffer = b.nextBuffer
+	b.nextBuffer = temp
 }
 
 type GameParams struct {
@@ -82,7 +88,7 @@ func (c *Cell) CheckRules() string {
 	for _, p := range adjacent {
 		if outOfBounds := checkArrayBounds(c, &p, gol.Board); outOfBounds == true {
 			continue
-		} else if gol.Board.currentGen[c.row+p[0]][c.col+p[1]].alive == true {
+		} else if gol.Board.currentBuffer[c.row+p[0]][c.col+p[1]].alive == true {
 			adjacentAliveCount++
 		}
 	}
@@ -105,21 +111,19 @@ func (l *Life) Sleep() {
 }
 
 func (l *Life) Tick() {
-	for rowIdx, cellArray := range l.Board.currentGen {
+	for rowIdx, cellArray := range l.Board.currentBuffer {
 		for colIdx, cell := range cellArray {
 			if result := cell.CheckRules(); result == "lives" {
-				l.Board.nextGen[rowIdx][colIdx].live()
+				l.Board.nextBuffer[rowIdx][colIdx].live()
 			} else if result == "dies" {
-				l.Board.nextGen[rowIdx][colIdx].kill()
+				l.Board.nextBuffer[rowIdx][colIdx].kill()
 			} else if result == "reborn" {
-				l.Board.nextGen[rowIdx][colIdx].birth()
+				l.Board.nextBuffer[rowIdx][colIdx].birth()
 			}
 		}
 	}
 
-	for rowIdx := range l.Board.nextGen {
-		copy(l.Board.currentGen[rowIdx], l.Board.nextGen[rowIdx])
-	}
+	l.Board.SwapBuffers()
 }
 
 func checkArrayBounds(c *Cell, p *pos, g *board) bool {
@@ -132,7 +136,7 @@ func (l *Life) Print() {
 	fmt.Println("\033[2J")
 	sb := strings.Builder{}
 
-	for _, cellArray := range l.Board.currentGen {
+	for _, cellArray := range l.Board.currentBuffer {
 		for _, cell := range cellArray {
 			sb.WriteString(string(cell.char))
 		}
@@ -144,12 +148,12 @@ func (l *Life) Print() {
 }
 
 func (l *Life) InitCells() *Life {
-	for rowIdx := range l.Board.currentGen {
-		l.Board.currentGen[rowIdx] = make([]Cell, l.Board.width)
+	for rowIdx := range l.Board.currentBuffer {
+		l.Board.currentBuffer[rowIdx] = make([]Cell, l.Board.width)
 	}
 
-	for rowIdx := range l.Board.currentGen {
-		for colIdx := range l.Board.currentGen[rowIdx] {
+	for rowIdx := range l.Board.currentBuffer {
+		for colIdx := range l.Board.currentBuffer[rowIdx] {
 
 			cell := Cell{
 				alive: false,
@@ -167,13 +171,13 @@ func (l *Life) InitCells() *Life {
 				}
 			}
 
-			l.Board.currentGen[rowIdx][colIdx] = cell
+			l.Board.currentBuffer[rowIdx][colIdx] = cell
 		}
 	}
 
-	for rowIdx := range l.Board.nextGen {
-		l.Board.nextGen[rowIdx] = make([]Cell, l.Board.width)
-		copy(l.Board.nextGen[rowIdx], l.Board.currentGen[rowIdx])
+	for rowIdx := range l.Board.nextBuffer {
+		l.Board.nextBuffer[rowIdx] = make([]Cell, l.Board.width)
+		copy(l.Board.nextBuffer[rowIdx], l.Board.currentBuffer[rowIdx])
 	}
 
 	return l
@@ -182,10 +186,10 @@ func (l *Life) InitCells() *Life {
 func InitGame(p *GameParams) *Life {
 	gol = Life{
 		Board: &board{
-			currentGen: make([][]Cell, p.height),
-			nextGen:    make([][]Cell, p.height),
-			height:     p.height,
-			width:      p.width,
+			currentBuffer: make([][]Cell, p.height),
+			nextBuffer:    make([][]Cell, p.height),
+			height:        p.height,
+			width:         p.width,
 		},
 		params: p,
 	}
@@ -228,7 +232,7 @@ func (s *ShapeCreator) CreateGlider(b *board, p pos) {
 	}
 
 	for _, position := range points {
-		b.currentGen[position[0]][position[1]].live()
+		b.currentBuffer[position[0]][position[1]].live()
 	}
 }
 
@@ -282,6 +286,6 @@ func (s *ShapeCreator) CreateGosperGliderGun(b *board, p pos) {
 	}
 
 	for _, position := range points {
-		b.currentGen[position[0]][position[1]].live()
+		b.currentBuffer[position[0]][position[1]].live()
 	}
 }
